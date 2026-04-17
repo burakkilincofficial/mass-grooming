@@ -126,6 +126,16 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
     setIsEditingAvatar(false);
   };
 
+  const handleOwnAvatarClick = () => {
+    if (room?.isRevealed) return;
+    const currentIndex = AVATARS.indexOf(currentUser?.avatar || "");
+    if (currentIndex !== -1) {
+      setAvatarPage(Math.floor(currentIndex / AVATARS_PER_PAGE));
+    }
+    setIsEditingAvatar(true);
+    setIsEditingCards(false);
+  };
+
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -269,7 +279,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
           {/* Top Row Players */}
           <div className="flex justify-center gap-6 mb-8 flex-wrap">
             {displayUsers.slice(0, Math.ceil(displayUsers.length / 2)).map(user => (
-              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} />
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} onAvatarClick={handleOwnAvatarClick} />
             ))}
           </div>
 
@@ -325,7 +335,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
           {/* Bottom Row Players */}
           <div className="flex justify-center gap-6 mt-12 flex-wrap">
             {displayUsers.slice(Math.ceil(displayUsers.length / 2)).map(user => (
-              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} />
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} onAvatarClick={handleOwnAvatarClick} />
             ))}
           </div>
 
@@ -339,29 +349,15 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
                 {isEditingCards ? "Edit Cards" : isEditingAvatar ? "Select New Avatar" : "Choose your card"}
               </h3>
               {!room.isRevealed && !isEditingCards && !isEditingAvatar && (
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => {
-                      setCardSetString(currentCards.join(", "));
-                      setIsEditingCards(true);
-                    }}
-                    className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                  >
-                    Edit Deck
-                  </button>
-                  <button
-                    onClick={() => {
-                      const currentIndex = AVATARS.indexOf(currentUser?.avatar || "");
-                      if (currentIndex !== -1) {
-                        setAvatarPage(Math.floor(currentIndex / AVATARS_PER_PAGE));
-                      }
-                      setIsEditingAvatar(true);
-                    }}
-                    className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                  >
-                    Change Avatar
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setCardSetString(currentCards.join(", "));
+                    setIsEditingCards(true);
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                >
+                  Edit Deck
+                </button>
               )}
             </div>
 
@@ -481,9 +477,10 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
   );
 }
 
-function PlayerCard({ user, isRevealed, currentUser, onKick }: { user: any, isRevealed: boolean, currentUser?: any, onKick?: (userId: string) => void }) {
+function PlayerCard({ user, isRevealed, currentUser, onKick, onAvatarClick }: { user: any, isRevealed: boolean, currentUser?: any, onKick?: (userId: string) => void, onAvatarClick?: () => void }) {
   const hasVoted = user.vote !== null;
-  const canKick = currentUser?.name?.toLowerCase() === 'bk' && currentUser?.id !== user.id;
+  const isCurrentUser = currentUser?.id === user.id;
+  const canKick = currentUser?.name?.toLowerCase() === 'bk' && !isCurrentUser;
 
   return (
     <div className="flex flex-col items-center gap-3 relative group">
@@ -496,11 +493,19 @@ function PlayerCard({ user, isRevealed, currentUser, onKick }: { user: any, isRe
           <X className="w-3 h-3" />
         </button>
       )}
-      <div className={`
+      <div 
+        onClick={() => {
+          if (isCurrentUser && onAvatarClick && !isRevealed) {
+            onAvatarClick();
+          }
+        }}
+        className={`
         relative w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all overflow-hidden
         ${!hasVoted ? 'bg-slate-800/50 border-2 border-dashed border-slate-700' : 
           isRevealed ? 'bg-blue-600 border-2 border-blue-400' : 'bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-indigo-400'}
-      `}>
+        ${isCurrentUser && !isRevealed ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 hover:scale-105' : ''}
+      `}
+      >
         {/* Avatar positioned inside the card */}
         {user.avatar && (
           <div className="absolute inset-0 z-0 flex items-end justify-center p-1 pt-8 pointer-events-none">
