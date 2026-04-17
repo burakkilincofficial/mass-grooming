@@ -17,47 +17,70 @@ const fetcher = (url: string) => fetch(url).then(async (res) => {
 
 const TaskNameInput = ({ roomId, initialTaskName, mutate }: { roomId: string, initialTaskName: string, mutate: any }) => {
   const [localTaskName, setLocalTaskName] = useState(initialTaskName);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Sync external changes when not typing
+  // Sync external changes when not editing
   useEffect(() => {
-    if (initialTaskName !== undefined && initialTaskName !== localTaskName && !isTyping) {
+    if (initialTaskName !== undefined && !isEditing) {
       setLocalTaskName(initialTaskName);
     }
-  }, [initialTaskName, isTyping]);
+  }, [initialTaskName, isEditing]);
 
-  // Debounce API calls
-  useEffect(() => {
-    if (!isTyping) return;
+  const handleSave = async () => {
+    if (localTaskName === initialTaskName) {
+      setIsEditing(false);
+      return;
+    }
+    
+    setIsEditing(false);
+    await fetch(`/api/room/${roomId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "UPDATE_TASK", payload: { taskName: localTaskName } }),
+    });
+    mutate();
+  };
 
-    const timer = setTimeout(() => {
-      fetch(`/api/room/${roomId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "UPDATE_TASK", payload: { taskName: localTaskName } }),
-      }).then(() => {
-        setIsTyping(false);
-        mutate();
-      });
-    }, 500);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setLocalTaskName(initialTaskName);
+      setIsEditing(false);
+    }
+  };
 
-    return () => clearTimeout(timer);
-  }, [localTaskName, isTyping, roomId, mutate]);
+  const hasChanges = localTaskName !== initialTaskName;
 
   return (
-    <div className="w-full max-w-2xl mb-8">
-      <input
-        type="text"
-        id="task-input"
-        placeholder="Enter task / story name here..."
-        value={localTaskName}
-        onChange={(e) => {
-          setLocalTaskName(e.target.value);
-          setIsTyping(true);
-        }}
-        onBlur={() => setIsTyping(false)}
-        className="w-full bg-transparent border-b-2 border-white/10 hover:border-white/30 focus:border-blue-500 text-center text-xl md:text-3xl font-medium outline-none py-3 transition-colors text-white placeholder:text-slate-600"
-      />
+    <div className="w-full max-w-2xl mb-8 flex flex-col items-center">
+      <div className="relative w-full flex items-center justify-center">
+        <input
+          type="text"
+          id="task-input"
+          placeholder="Enter task / story name here..."
+          value={localTaskName}
+          onChange={(e) => {
+            setLocalTaskName(e.target.value);
+            setIsEditing(true);
+          }}
+          onKeyDown={handleKeyDown}
+          className="w-full bg-transparent border-b-2 border-white/10 hover:border-white/30 focus:border-blue-500 text-center text-xl md:text-3xl font-medium outline-none py-3 transition-colors text-white placeholder:text-slate-600"
+        />
+        {hasChanges && (
+          <button
+            onClick={handleSave}
+            className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-sm font-medium shadow-lg"
+          >
+            <Check className="w-4 h-4" /> Save
+          </button>
+        )}
+      </div>
+      {hasChanges && (
+        <span className="text-xs text-amber-400/80 mt-2 font-medium tracking-wide">
+          Unsaved changes. Press Enter or click Save.
+        </span>
+      )}
     </div>
   );
 };

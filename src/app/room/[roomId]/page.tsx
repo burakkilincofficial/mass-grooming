@@ -3,6 +3,14 @@
 import { useState, useEffect, use } from "react";
 import { motion } from "framer-motion";
 import RoomBoard from "@/components/RoomBoard";
+import useSWR from "swr";
+import { Room } from "@/lib/types";
+
+const fetcher = (url: string) => fetch(url).then(async (res) => {
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'An error occurred');
+  return data;
+});
 
 const AVATARS = [
   ...Array.from({ length: 151 }).map((_, i) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${i + 1}.png`),
@@ -12,6 +20,15 @@ const AVATARS = [
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   
+  const [hasJoined, setHasJoined] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const { data: room } = useSWR<Room>(!hasJoined ? `/api/room/${roomId}` : null, fetcher, {
+    refreshInterval: 1000,
+  });
+
+  const takenAvatars = room?.users?.map(u => u.avatar).filter(Boolean) || [];
+
   const [userName, setUserName] = useState("");
   const [isSpectator, setIsSpectator] = useState(false);
   const [avatar, setAvatar] = useState(AVATARS[0]);
@@ -19,12 +36,18 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   const AVATARS_PER_PAGE = 12;
   const totalPages = Math.ceil(AVATARS.length / AVATARS_PER_PAGE);
 
+  // Default to first available avatar if current is taken
+  useEffect(() => {
+    if (takenAvatars.includes(avatar)) {
+      const firstAvailable = AVATARS.find(a => !takenAvatars.includes(a));
+      if (firstAvailable) setAvatar(firstAvailable);
+    }
+  }, [takenAvatars, avatar]);
+
   const displayedAvatars = AVATARS.slice(
     avatarPage * AVATARS_PER_PAGE, 
     (avatarPage + 1) * AVATARS_PER_PAGE
   );
-  const [hasJoined, setHasJoined] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check local storage for existing user info in this room
@@ -115,20 +138,25 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
                 </div>
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 min-h-[120px] content-start">
-                {displayedAvatars.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setAvatar(a)}
-                    className={`w-12 h-12 p-1 flex items-center justify-center rounded-xl transition-all overflow-hidden ${
-                      avatar === a 
-                        ? 'bg-blue-600 shadow-lg shadow-blue-500/30 scale-110 border border-blue-400' 
-                        : 'bg-white/5 hover:bg-white/10 border border-transparent'
-                    }`}
-                  >
-                    <img src={a} alt="Avatar" className="w-full h-full object-contain drop-shadow-md" />
-                  </button>
-                ))}
+                {displayedAvatars.map((a) => {
+                  const isTaken = takenAvatars.includes(a);
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => !isTaken && setAvatar(a)}
+                      disabled={isTaken}
+                      className={`w-12 h-12 p-1 flex items-center justify-center rounded-xl transition-all overflow-hidden ${
+                        isTaken ? 'opacity-20 cursor-not-allowed grayscale' :
+                        avatar === a 
+                          ? 'bg-blue-600 shadow-lg shadow-blue-500/30 scale-110 border border-blue-400' 
+                          : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                      }`}
+                    >
+                      <img src={a} alt="Avatar" className="w-full h-full object-contain drop-shadow-md" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="flex items-center gap-3">
