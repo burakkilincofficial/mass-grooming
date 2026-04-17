@@ -1,14 +1,19 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import { Room } from './types';
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL || '',
+  token: process.env.KV_REST_API_TOKEN || '',
+});
 
 const PREFIX = 'room:';
 
 export const getRoom = async (id: string): Promise<Room | null> => {
   try {
-    const room = await kv.get<Room>(`${PREFIX}${id}`);
+    const room = await redis.get<Room>(`${PREFIX}${id}`);
     return room;
   } catch (error) {
-    console.error('Failed to get room from KV:', error);
+    console.error('Failed to get room from Upstash Redis:', error);
     return null;
   }
 };
@@ -25,11 +30,10 @@ export const createRoom = async (name: string): Promise<Room> => {
   };
   
   // Set room with 24-hour expiration (86400 seconds)
-  await kv.set(`${PREFIX}${id}`, newRoom, { ex: 86400 });
+  await redis.set(`${PREFIX}${id}`, newRoom, { ex: 86400 });
   return newRoom;
 };
 
 export const updateRoom = async (id: string, room: Room): Promise<void> => {
-  // Keep the same expiration (it resets to 24h on every update for simplicity, or we can just use normal set)
-  await kv.set(`${PREFIX}${id}`, room, { ex: 86400 });
+  await redis.set(`${PREFIX}${id}`, room, { ex: 86400 });
 };
