@@ -354,7 +354,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
                     setCardSetString(currentCards.join(", "));
                     setIsEditingCards(true);
                   }}
-                  className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                  className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-full transition-colors font-medium ml-2 shadow-sm"
                 >
                   Edit Deck
                 </button>
@@ -526,7 +526,7 @@ function PlayerCard({ user, isRevealed, currentUser, onKick, onAvatarClick }: { 
           ) : null}
         </div>
       </div>
-      <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate text-center">
+      <span className="text-sm font-medium text-slate-300 max-w-[120px] text-center break-words leading-tight">
         {user.name}
       </span>
     </div>
