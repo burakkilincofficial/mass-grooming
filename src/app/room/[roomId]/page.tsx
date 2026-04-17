@@ -5,18 +5,8 @@ import { motion } from "framer-motion";
 import RoomBoard from "@/components/RoomBoard";
 
 const AVATARS = [
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png",
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png",
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png",
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png",
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png",
-  "https://digimon-api.com/images/digimon/w/Agumon.png",
-  "https://digimon-api.com/images/digimon/w/Gabumon.png",
-  "https://digimon-api.com/images/digimon/w/Patamon.png",
-  "https://digimon-api.com/images/digimon/w/Tailmon.png",
-  "https://digimon-api.com/images/digimon/w/Guilmon.png",
-  "https://digimon-api.com/images/digimon/w/Veemon.png"
+  ...Array.from({ length: 151 }).map((_, i) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${i + 1}.png`),
+  ...Array.from({ length: 50 }).map((_, i) => `https://rickandmortyapi.com/api/character/avatar/${i + 1}.jpeg`),
 ];
 
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
@@ -25,6 +15,14 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   const [userName, setUserName] = useState("");
   const [isSpectator, setIsSpectator] = useState(false);
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [avatarPage, setAvatarPage] = useState(0);
+  const AVATARS_PER_PAGE = 12;
+  const totalPages = Math.ceil(AVATARS.length / AVATARS_PER_PAGE);
+
+  const displayedAvatars = AVATARS.slice(
+    avatarPage * AVATARS_PER_PAGE, 
+    (avatarPage + 1) * AVATARS_PER_PAGE
+  );
   const [hasJoined, setHasJoined] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -94,9 +92,30 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-2">Select Avatar</label>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                {AVATARS.map((a) => (
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-slate-400">Select Avatar</label>
+                <div className="flex gap-2 items-center">
+                  <button 
+                    type="button" 
+                    onClick={() => setAvatarPage(p => Math.max(0, p - 1))}
+                    disabled={avatarPage === 0}
+                    className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-xs font-medium transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs text-slate-500 font-medium w-10 text-center">{avatarPage + 1} / {totalPages}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setAvatarPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={avatarPage === totalPages - 1}
+                    className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-xs font-medium transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 min-h-[120px] content-start">
+                {displayedAvatars.map((a) => (
                   <button
                     key={a}
                     type="button"
