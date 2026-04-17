@@ -15,15 +15,66 @@ const fetcher = (url: string) => fetch(url).then(async (res) => {
   return data;
 });
 
+const TaskNameInput = ({ roomId, initialTaskName, mutate }: { roomId: string, initialTaskName: string, mutate: any }) => {
+  const [localTaskName, setLocalTaskName] = useState(initialTaskName);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Sync external changes when not typing
+  useEffect(() => {
+    if (initialTaskName !== undefined && initialTaskName !== localTaskName && !isTyping) {
+      setLocalTaskName(initialTaskName);
+    }
+  }, [initialTaskName, isTyping]);
+
+  // Debounce API calls
+  useEffect(() => {
+    if (!isTyping) return;
+
+    const timer = setTimeout(() => {
+      fetch(`/api/room/${roomId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "UPDATE_TASK", payload: { taskName: localTaskName } }),
+      }).then(() => {
+        setIsTyping(false);
+        mutate();
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [localTaskName, isTyping, roomId, mutate]);
+
+  return (
+    <div className="w-full max-w-2xl mb-8">
+      <input
+        type="text"
+        id="task-input"
+        placeholder="Enter task / story name here..."
+        value={localTaskName}
+        onChange={(e) => {
+          setLocalTaskName(e.target.value);
+          setIsTyping(true);
+        }}
+        onBlur={() => setIsTyping(false)}
+        className="w-full bg-transparent border-b-2 border-white/10 hover:border-white/30 focus:border-blue-500 text-center text-xl md:text-3xl font-medium outline-none py-3 transition-colors text-white placeholder:text-slate-600"
+      />
+    </div>
+  );
+};
+
 export default function RoomBoard({ roomId, userId }: { roomId: string, userId: string }) {
   const router = useRouter();
   const { data: room, error, mutate } = useSWR<Room>(`/api/room/${roomId}`, fetcher, {
     refreshInterval: 1000, // Poll every second for real-time feel
   });
   const [copied, setCopied] = useState(false);
+  const [isEditingCards, setIsEditingCards] = useState(false);
+  const [cardSetString, setCardSetString] = useState("");
 
   const currentUser = room?.users?.find((u) => u.id === userId);
   const myVote = currentUser?.vote;
+
+  const currentCards = room?.cardSet || FIBONACCI;
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -45,6 +96,18 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
     await handleAction("LEAVE", { userId });
     localStorage.removeItem(`room_${roomId}_user`);
     router.push("/");
+  };
+
+  const saveCardSet = async () => {
+    const newCards = cardSetString
+      .split(",")
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+      
+    if (newCards.length > 0) {
+      await handleAction("UPDATE_CARD_SET", { cardSet: newCards });
+    }
+    setIsEditingCards(false);
   };
 
   if (error) {
@@ -128,15 +191,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
       <main className="flex-1 flex flex-col items-center">
         
         {/* Task Name Input Area */}
-        <div className="w-full max-w-2xl mb-8">
-          <input
-            type="text"
-            placeholder="Enter task / story name here..."
-            value={room.taskName || ""}
-            onChange={(e) => handleAction("UPDATE_TASK", { taskName: e.target.value })}
-            className="w-full bg-transparent border-b-2 border-white/10 hover:border-white/30 focus:border-blue-500 text-center text-xl md:text-3xl font-medium outline-none py-3 transition-colors text-white placeholder:text-slate-600"
-          />
-        </div>
+        <TaskNameInput roomId={roomId} initialTaskName={room.taskName || ""} mutate={mutate} />
 
         {/* Table/Board */}
         <div className="relative w-full max-w-4xl min-h-[400px] flex flex-col items-center justify-center mb-16">
@@ -208,27 +263,73 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
 
         {/* Card Selection */}
         {!currentUser?.isSpectator && (
-          <div className="w-full max-w-4xl mt-auto">
-            <h3 className="text-center text-sm font-medium text-slate-400 mb-4 uppercase tracking-widest">Choose your card</h3>
-            <div className="flex flex-wrap justify-center gap-3 md:gap-4">
-              {FIBONACCI.map((val) => (
+          <div className="w-full max-w-4xl mt-auto relative">
+            <div className="flex justify-center items-center gap-3 mb-4">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-widest">
+                {isEditingCards ? "Edit Cards" : "Choose your card"}
+              </h3>
+              {!room.isRevealed && !isEditingCards && (
                 <button
-                  key={val}
-                  onClick={() => handleAction("VOTE", { userId, vote: myVote === val ? null : val })}
-                  disabled={room.isRevealed || room.isVotingClosed}
-                  className={`
-                    w-12 h-16 md:w-16 md:h-24 rounded-xl text-lg md:text-2xl font-bold transition-all
-                    flex items-center justify-center border-2 shadow-lg
-                    ${myVote === val 
-                      ? 'bg-blue-600 border-blue-400 text-white -translate-y-4 shadow-blue-500/50' 
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:-translate-y-2'}
-                    ${(room.isRevealed || room.isVotingClosed) ? 'opacity-50 cursor-not-allowed transform-none' : ''}
-                  `}
+                  onClick={() => {
+                    setCardSetString(currentCards.join(", "));
+                    setIsEditingCards(true);
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
                 >
-                  {val}
+                  Edit Deck
                 </button>
-              ))}
+              )}
             </div>
+
+            {isEditingCards ? (
+              <div className="flex flex-col items-center gap-4 bg-slate-800/50 p-6 rounded-2xl border border-slate-700 w-full max-w-2xl mx-auto">
+                <p className="text-xs text-slate-400 text-center">
+                  Enter cards separated by commas (e.g. 1, 2, 3, S, M, L)
+                </p>
+                <input
+                  type="text"
+                  value={cardSetString}
+                  onChange={(e) => setCardSetString(e.target.value)}
+                  placeholder="0, 1, 2, 3, 5, 8, 13, 21, ?, ☕"
+                  className="w-full bg-black/30 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsEditingCards(false)}
+                    className="px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveCardSet}
+                    disabled={!cardSetString.trim()}
+                    className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors disabled:opacity-50"
+                  >
+                    Save & Reset Votes
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+                {currentCards.map((val: string) => (
+                  <button
+                    key={val}
+                    onClick={() => handleAction("VOTE", { userId, vote: myVote === val ? null : val })}
+                    disabled={room.isRevealed || room.isVotingClosed}
+                    className={`
+                      w-12 h-16 md:w-16 md:h-24 rounded-xl text-lg md:text-xl font-bold transition-all
+                      flex items-center justify-center border-2 shadow-lg px-1 overflow-hidden
+                      ${myVote === val 
+                        ? 'bg-blue-600 border-blue-400 text-white -translate-y-4 shadow-blue-500/50' 
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:-translate-y-2'}
+                      ${(room.isRevealed || room.isVotingClosed) ? 'opacity-50 cursor-not-allowed transform-none' : ''}
+                    `}
+                  >
+                    <span className="truncate">{val}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -251,26 +352,29 @@ function PlayerCard({ user, isRevealed }: { user: any, isRevealed: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <div className={`
-        relative w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all
+        relative w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all overflow-hidden
         ${!hasVoted ? 'bg-slate-800/50 border-2 border-dashed border-slate-700' : 
           isRevealed ? 'bg-blue-600 border-2 border-blue-400' : 'bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-indigo-400'}
       `}>
-        {/* Avatar positioned absolutely inside the card or near it */}
+        {/* Avatar positioned inside the card */}
         {user.avatar && (
-          <div className="absolute -top-4 -right-4 w-12 h-12 z-10 drop-shadow-xl pointer-events-none">
+          <div className="absolute inset-0 z-0 flex items-end justify-center p-1 pt-8 pointer-events-none">
             {user.avatar.startsWith('http') ? (
-              <img src={user.avatar} alt={user.name} className="w-full h-full object-contain" />
+              <img src={user.avatar} alt={user.name} className="w-full h-full object-contain drop-shadow-2xl" />
             ) : (
-              <span className="text-2xl">{user.avatar}</span>
+              <span className="text-4xl">{user.avatar}</span>
             )}
           </div>
         )}
 
-        {isRevealed && hasVoted ? (
-          <span className="text-2xl font-bold text-white">{user.vote}</span>
-        ) : hasVoted ? (
-          <span className="w-6 h-6 rounded-full bg-white/20 animate-pulse" />
-        ) : null}
+        {/* Vote positioned at the top */}
+        <div className="absolute top-1 left-0 right-0 flex justify-center z-10">
+          {isRevealed && hasVoted ? (
+            <span className="text-2xl md:text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{user.vote}</span>
+          ) : hasVoted ? (
+            <span className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-pulse mt-2" />
+          ) : null}
+        </div>
       </div>
       <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate text-center">
         {user.name}

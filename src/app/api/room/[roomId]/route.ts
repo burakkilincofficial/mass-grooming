@@ -45,6 +45,18 @@ export async function PUT(
       const { taskName } = action.payload as { taskName: string };
       room.taskName = taskName;
     }
+
+    if (action.type === 'UPDATE_CARD_SET') {
+      const { cardSet } = action.payload as { cardSet: string[] };
+      room.cardSet = cardSet;
+      
+      // Reset votes since the old options might be invalid
+      room.isRevealed = false;
+      room.isVotingClosed = false;
+      room.users.forEach(u => {
+        u.vote = null;
+      });
+    }
     
     if (action.type === 'VOTE') {
       const { userId, vote } = action.payload as { userId: string, vote: string | null };

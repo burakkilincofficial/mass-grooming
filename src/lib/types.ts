@@ -13,5 +13,6 @@ export type Room = {
   users: User[];
   isRevealed: boolean;
   isVotingClosed: boolean;
+  cardSet?: string[];
   createdAt: number;
 };
