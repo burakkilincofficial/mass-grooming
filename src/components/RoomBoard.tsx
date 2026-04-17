@@ -125,13 +125,21 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
     await handleAction("LEAVE", { userId: targetUserId });
   };
 
+  const [wasInRoom, setWasInRoom] = useState(false);
+
   useEffect(() => {
-    if (room && room.users && !room.users.some(u => u.id === userId)) {
+    if (!room?.users) return;
+    
+    const isCurrentlyInRoom = room.users.some(u => u.id === userId);
+    
+    if (isCurrentlyInRoom) {
+      setWasInRoom(true);
+    } else if (wasInRoom) {
       // Current user was kicked or removed
       localStorage.removeItem(`room_${roomId}_user`);
       router.push("/");
     }
-  }, [room, roomId, userId, router]);
+  }, [room?.users, roomId, userId, router, wasInRoom]);
 
   const saveCardSet = async () => {
     const newCards = cardSetString
