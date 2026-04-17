@@ -37,7 +37,13 @@ export async function PUT(
       } else {
         existingUser.name = user.name;
         existingUser.isSpectator = user.isSpectator;
+        existingUser.avatar = user.avatar;
       }
+    }
+    
+    if (action.type === 'UPDATE_TASK') {
+      const { taskName } = action.payload as { taskName: string };
+      room.taskName = taskName;
     }
     
     if (action.type === 'VOTE') {

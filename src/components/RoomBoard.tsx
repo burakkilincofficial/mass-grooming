@@ -77,6 +77,16 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
   const activeUsers = room.users.filter(u => !u.isSpectator);
   const spectators = room.users.filter(u => u.isSpectator);
   
+  // Sort users if revealed
+  let displayUsers = [...activeUsers];
+  if (room.isRevealed) {
+    displayUsers.sort((a, b) => {
+      const valA = a.vote === "?" || a.vote === "☕" ? 999 : parseInt(a.vote || "0");
+      const valB = b.vote === "?" || b.vote === "☕" ? 999 : parseInt(b.vote || "0");
+      return valA - valB;
+    });
+  }
+
   // Calculate average (round up if .5 or higher)
   const votes = activeUsers.map(u => u.vote).filter(v => v !== null && v !== "?" && v !== "☕") as string[];
   const average = votes.length > 0 
@@ -116,12 +126,24 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
 
       {/* Main Board Area */}
       <main className="flex-1 flex flex-col items-center">
+        
+        {/* Task Name Input Area */}
+        <div className="w-full max-w-2xl mb-8">
+          <input
+            type="text"
+            placeholder="Enter task / story name here..."
+            value={room.taskName || ""}
+            onChange={(e) => handleAction("UPDATE_TASK", { taskName: e.target.value })}
+            className="w-full bg-transparent border-b-2 border-white/10 hover:border-white/30 focus:border-blue-500 text-center text-xl md:text-3xl font-medium outline-none py-3 transition-colors text-white placeholder:text-slate-600"
+          />
+        </div>
+
         {/* Table/Board */}
         <div className="relative w-full max-w-4xl min-h-[400px] flex flex-col items-center justify-center mb-16">
           
           {/* Top Row Players */}
           <div className="flex justify-center gap-6 mb-8 flex-wrap">
-            {activeUsers.slice(0, Math.ceil(activeUsers.length / 2)).map(user => (
+            {displayUsers.slice(0, Math.ceil(displayUsers.length / 2)).map(user => (
               <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
             ))}
           </div>
@@ -177,7 +199,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
 
           {/* Bottom Row Players */}
           <div className="flex justify-center gap-6 mt-12 flex-wrap">
-            {activeUsers.slice(Math.ceil(activeUsers.length / 2)).map(user => (
+            {displayUsers.slice(Math.ceil(displayUsers.length / 2)).map(user => (
               <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
             ))}
           </div>
@@ -229,10 +251,21 @@ function PlayerCard({ user, isRevealed }: { user: any, isRevealed: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <div className={`
-        w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all
+        relative w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all
         ${!hasVoted ? 'bg-slate-800/50 border-2 border-dashed border-slate-700' : 
           isRevealed ? 'bg-blue-600 border-2 border-blue-400' : 'bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-indigo-400'}
       `}>
+        {/* Avatar positioned absolutely inside the card or near it */}
+        {user.avatar && (
+          <div className="absolute -top-4 -right-4 w-12 h-12 z-10 drop-shadow-xl pointer-events-none">
+            {user.avatar.startsWith('http') ? (
+              <img src={user.avatar} alt={user.name} className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-2xl">{user.avatar}</span>
+            )}
+          </div>
+        )}
+
         {isRevealed && hasVoted ? (
           <span className="text-2xl font-bold text-white">{user.vote}</span>
         ) : hasVoted ? (

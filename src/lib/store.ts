@@ -23,6 +23,7 @@ export const createRoom = async (name: string): Promise<Room> => {
   const newRoom: Room = {
     id,
     name,
+    taskName: '',
     users: [],
     isRevealed: false,
     isVotingClosed: false,

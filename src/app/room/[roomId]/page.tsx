@@ -4,11 +4,27 @@ import { useState, useEffect, use } from "react";
 import { motion } from "framer-motion";
 import RoomBoard from "@/components/RoomBoard";
 
+const AVATARS = [
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png",
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png",
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png",
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png",
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png",
+  "https://digimon-api.com/images/digimon/w/Agumon.png",
+  "https://digimon-api.com/images/digimon/w/Gabumon.png",
+  "https://digimon-api.com/images/digimon/w/Patamon.png",
+  "https://digimon-api.com/images/digimon/w/Tailmon.png",
+  "https://digimon-api.com/images/digimon/w/Guilmon.png",
+  "https://digimon-api.com/images/digimon/w/Veemon.png"
+];
+
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   
   const [userName, setUserName] = useState("");
   const [isSpectator, setIsSpectator] = useState(false);
+  const [avatar, setAvatar] = useState(AVATARS[0]);
   const [hasJoined, setHasJoined] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -20,6 +36,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       setUserName(parsed.name);
       setUserId(parsed.id);
       setIsSpectator(parsed.isSpectator);
+      if (parsed.avatar) setAvatar(parsed.avatar);
       setHasJoined(true);
     }
   }, [roomId]);
@@ -33,6 +50,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       id: newUserId,
       name: userName,
       isSpectator,
+      avatar,
       vote: null
     };
 
@@ -74,6 +92,25 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
                 placeholder="John Doe"
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Select Avatar</label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {AVATARS.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAvatar(a)}
+                    className={`w-12 h-12 p-1 flex items-center justify-center rounded-xl transition-all overflow-hidden ${
+                      avatar === a 
+                        ? 'bg-blue-600 shadow-lg shadow-blue-500/30 scale-110 border border-blue-400' 
+                        : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                    }`}
+                  >
+                    <img src={a} alt="Avatar" className="w-full h-full object-contain drop-shadow-md" />
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <input
