@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Users, Eye, RotateCcw, Check, LogOut } from "lucide-react";
+import { Copy, Users, Eye, RotateCcw, Check, LogOut, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Room } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -97,6 +97,18 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
     localStorage.removeItem(`room_${roomId}_user`);
     router.push("/");
   };
+
+  const handleKick = async (targetUserId: string) => {
+    await handleAction("LEAVE", { userId: targetUserId });
+  };
+
+  useEffect(() => {
+    if (room && room.users && !room.users.some(u => u.id === userId)) {
+      // Current user was kicked or removed
+      localStorage.removeItem(`room_${roomId}_user`);
+      router.push("/");
+    }
+  }, [room, roomId, userId, router]);
 
   const saveCardSet = async () => {
     const newCards = cardSetString
@@ -199,7 +211,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
           {/* Top Row Players */}
           <div className="flex justify-center gap-6 mb-8 flex-wrap">
             {displayUsers.slice(0, Math.ceil(displayUsers.length / 2)).map(user => (
-              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} />
             ))}
           </div>
 
@@ -255,7 +267,7 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
           {/* Bottom Row Players */}
           <div className="flex justify-center gap-6 mt-12 flex-wrap">
             {displayUsers.slice(Math.ceil(displayUsers.length / 2)).map(user => (
-              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} currentUser={currentUser} onKick={handleKick} />
             ))}
           </div>
 
@@ -346,11 +358,21 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
   );
 }
 
-function PlayerCard({ user, isRevealed }: { user: any, isRevealed: boolean }) {
+function PlayerCard({ user, isRevealed, currentUser, onKick }: { user: any, isRevealed: boolean, currentUser?: any, onKick?: (userId: string) => void }) {
   const hasVoted = user.vote !== null;
+  const canKick = currentUser?.name?.toLowerCase() === 'bk' && currentUser?.id !== user.id;
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-3 relative group">
+      {canKick && onKick && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onKick(user.id); }}
+          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-lg"
+          title="Kick Player"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
       <div className={`
         relative w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all overflow-hidden
         ${!hasVoted ? 'bg-slate-800/50 border-2 border-dashed border-slate-700' : 
