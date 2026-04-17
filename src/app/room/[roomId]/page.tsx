@@ -5,17 +5,13 @@ import { motion } from "framer-motion";
 import RoomBoard from "@/components/RoomBoard";
 import useSWR from "swr";
 import { Room } from "@/lib/types";
+import { AVATARS } from "@/lib/constants";
 
 const fetcher = (url: string) => fetch(url).then(async (res) => {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'An error occurred');
   return data;
 });
-
-const AVATARS = [
-  ...Array.from({ length: 151 }).map((_, i) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${i + 1}.png`),
-  ...Array.from({ length: 50 }).map((_, i) => `https://rickandmortyapi.com/api/character/avatar/${i + 1}.jpeg`),
-];
 
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);

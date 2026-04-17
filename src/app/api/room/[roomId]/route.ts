@@ -46,6 +46,14 @@ export async function PUT(
       room.taskName = taskName;
     }
 
+    if (action.type === 'UPDATE_AVATAR') {
+      const { userId, avatar } = action.payload as { userId: string, avatar: string };
+      const user = room.users.find(u => u.id === userId);
+      if (user) {
+        user.avatar = avatar;
+      }
+    }
+
     if (action.type === 'UPDATE_CARD_SET') {
       const { cardSet } = action.payload as { cardSet: string[] };
       room.cardSet = cardSet;

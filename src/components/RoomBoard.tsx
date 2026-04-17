@@ -6,6 +6,7 @@ import { Copy, Users, Eye, RotateCcw, Check, LogOut, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Room } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import { AVATARS } from "@/lib/constants";
 
 const FIBONACCI = ["0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "?", "☕"];
 
@@ -92,12 +93,38 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
   });
   const [copied, setCopied] = useState(false);
   const [isEditingCards, setIsEditingCards] = useState(false);
+  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+  const [avatarPage, setAvatarPage] = useState(0);
   const [cardSetString, setCardSetString] = useState("");
 
   const currentUser = room?.users?.find((u) => u.id === userId);
   const myVote = currentUser?.vote;
 
   const currentCards = room?.cardSet || FIBONACCI;
+
+  const AVATARS_PER_PAGE = 12;
+  const totalPages = Math.ceil(AVATARS.length / AVATARS_PER_PAGE);
+  const displayedAvatars = AVATARS.slice(
+    avatarPage * AVATARS_PER_PAGE,
+    (avatarPage + 1) * AVATARS_PER_PAGE
+  );
+
+  const takenAvatars = room?.users?.filter(u => u.id !== userId).map(u => u.avatar).filter(Boolean) || [];
+
+  const handleAvatarChange = async (newAvatar: string) => {
+    if (takenAvatars.includes(newAvatar)) return;
+    
+    // Optimistically update localStorage
+    const storedInfo = localStorage.getItem(`room_${roomId}_user`);
+    if (storedInfo) {
+      const parsed = JSON.parse(storedInfo);
+      parsed.avatar = newAvatar;
+      localStorage.setItem(`room_${roomId}_user`, JSON.stringify(parsed));
+    }
+
+    await handleAction("UPDATE_AVATAR", { userId, avatar: newAvatar });
+    setIsEditingAvatar(false);
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -309,22 +336,87 @@ export default function RoomBoard({ roomId, userId }: { roomId: string, userId: 
           <div className="w-full max-w-4xl mt-auto relative">
             <div className="flex justify-center items-center gap-3 mb-4">
               <h3 className="text-sm font-medium text-slate-400 uppercase tracking-widest">
-                {isEditingCards ? "Edit Cards" : "Choose your card"}
+                {isEditingCards ? "Edit Cards" : isEditingAvatar ? "Select New Avatar" : "Choose your card"}
               </h3>
-              {!room.isRevealed && !isEditingCards && (
-                <button
-                  onClick={() => {
-                    setCardSetString(currentCards.join(", "));
-                    setIsEditingCards(true);
-                  }}
-                  className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
-                >
-                  Edit Deck
-                </button>
+              {!room.isRevealed && !isEditingCards && !isEditingAvatar && (
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setCardSetString(currentCards.join(", "));
+                      setIsEditingCards(true);
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                  >
+                    Edit Deck
+                  </button>
+                  <button
+                    onClick={() => {
+                      const currentIndex = AVATARS.indexOf(currentUser?.avatar || "");
+                      if (currentIndex !== -1) {
+                        setAvatarPage(Math.floor(currentIndex / AVATARS_PER_PAGE));
+                      }
+                      setIsEditingAvatar(true);
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                  >
+                    Change Avatar
+                  </button>
+                </div>
               )}
             </div>
 
-            {isEditingCards ? (
+            {isEditingAvatar ? (
+              <div className="flex flex-col items-center gap-4 bg-slate-800/50 p-6 rounded-2xl border border-slate-700 w-full max-w-2xl mx-auto">
+                <div className="flex justify-between items-center w-full mb-2">
+                  <div className="flex gap-2 items-center mx-auto">
+                    <button 
+                      type="button" 
+                      onClick={() => setAvatarPage(p => Math.max(0, p - 1))}
+                      disabled={avatarPage === 0}
+                      className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-xs font-medium transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-slate-500 font-medium w-10 text-center">{avatarPage + 1} / {totalPages}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setAvatarPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={avatarPage === totalPages - 1}
+                      className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-xs font-medium transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 w-full content-start">
+                  {displayedAvatars.map((a) => {
+                    const isTaken = takenAvatars.includes(a);
+                    const isCurrent = currentUser?.avatar === a;
+                    return (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => handleAvatarChange(a)}
+                        disabled={isTaken || isCurrent}
+                        className={`w-12 h-12 p-1 flex items-center justify-center rounded-xl transition-all overflow-hidden ${
+                          isCurrent ? 'bg-blue-600 shadow-lg shadow-blue-500/30 scale-110 border border-blue-400' :
+                          isTaken ? 'opacity-20 cursor-not-allowed grayscale' :
+                          'bg-white/5 hover:bg-white/10 border border-transparent'
+                        }`}
+                      >
+                        <img src={a} alt="Avatar" className="w-full h-full object-contain drop-shadow-md" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setIsEditingAvatar(false)}
+                  className="mt-4 px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : isEditingCards ? (
               <div className="flex flex-col items-center gap-4 bg-slate-800/50 p-6 rounded-2xl border border-slate-700 w-full max-w-2xl mx-auto">
                 <p className="text-xs text-slate-400 text-center">
                   Enter cards separated by commas (e.g. 1, 2, 3, S, M, L)
