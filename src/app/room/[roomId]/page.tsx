@@ -1,0 +1,104 @@
+"use client";
+
+import { useState, useEffect, use } from "react";
+import { motion } from "framer-motion";
+import RoomBoard from "@/components/RoomBoard";
+
+export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params);
+  
+  const [userName, setUserName] = useState("");
+  const [isSpectator, setIsSpectator] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check local storage for existing user info in this room
+    const storedInfo = localStorage.getItem(`room_${roomId}_user`);
+    if (storedInfo) {
+      const parsed = JSON.parse(storedInfo);
+      setUserName(parsed.name);
+      setUserId(parsed.id);
+      setIsSpectator(parsed.isSpectator);
+      setHasJoined(true);
+    }
+  }, [roomId]);
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userName.trim()) return;
+
+    const newUserId = userId || Math.random().toString(36).substring(2, 9);
+    const userInfo = {
+      id: newUserId,
+      name: userName,
+      isSpectator,
+      vote: null
+    };
+
+    try {
+      await fetch(`/api/room/${roomId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "JOIN",
+          payload: { user: userInfo }
+        })
+      });
+
+      localStorage.setItem(`room_${roomId}_user`, JSON.stringify(userInfo));
+      setUserId(newUserId);
+      setHasJoined(true);
+    } catch (error) {
+      console.error("Failed to join room", error);
+    }
+  };
+
+  if (!hasJoined) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-panel p-8 max-w-md w-full"
+        >
+          <h2 className="text-2xl font-bold mb-6 text-center">Join Room</h2>
+          <form onSubmit={handleJoin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Your Name</label>
+              <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-black/20 border border-white/10 focus:border-blue-500 outline-none transition-colors"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="spectator"
+                checked={isSpectator}
+                onChange={(e) => setIsSpectator(e.target.checked)}
+                className="w-5 h-5 rounded bg-black/20 border-white/10 text-blue-500 focus:ring-blue-500/20"
+              />
+              <label htmlFor="spectator" className="text-sm font-medium text-slate-300">
+                Join as Spectator
+              </label>
+            </div>
+            <button
+              type="submit"
+              disabled={!userName.trim()}
+              className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors disabled:opacity-50"
+            >
+              Enter Room
+            </button>
+          </form>
+        </motion.div>
+      </main>
+    );
+  }
+
+  return <RoomBoard roomId={roomId} userId={userId!} />;
+}

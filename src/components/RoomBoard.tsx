@@ -1,0 +1,247 @@
+"use client";
+
+import useSWR from "swr";
+import { motion, AnimatePresence } from "framer-motion";
+import { Copy, Users, Eye, RotateCcw, Check, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Room } from "@/lib/types";
+import { useRouter } from "next/navigation";
+
+const FIBONACCI = ["0", "1", "2", "3", "5", "8", "13", "21", "34", "55", "89", "?", "☕"];
+
+const fetcher = (url: string) => fetch(url).then(async (res) => {
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'An error occurred');
+  return data;
+});
+
+export default function RoomBoard({ roomId, userId }: { roomId: string, userId: string }) {
+  const router = useRouter();
+  const { data: room, error, mutate } = useSWR<Room>(`/api/room/${roomId}`, fetcher, {
+    refreshInterval: 1000, // Poll every second for real-time feel
+  });
+  const [copied, setCopied] = useState(false);
+
+  const currentUser = room?.users?.find((u) => u.id === userId);
+  const myVote = currentUser?.vote;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAction = async (type: string, payload?: any) => {
+    // Optimistic UI update could be added here
+    await fetch(`/api/room/${roomId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, payload }),
+    });
+    mutate(); // re-fetch immediately
+  };
+
+  const handleLeave = async () => {
+    await handleAction("LEAVE", { userId });
+    localStorage.removeItem(`room_${roomId}_user`);
+    router.push("/");
+  };
+
+  if (error) {
+    if (error.message === 'Room not found') {
+      return (
+        <div className="flex h-screen items-center justify-center flex-col gap-4">
+          <div className="text-xl font-semibold text-slate-300">Room not found</div>
+          <p className="text-slate-500">The room you are looking for does not exist or has expired.</p>
+          <button 
+            onClick={() => {
+              localStorage.removeItem(`room_${roomId}_user`);
+              router.push('/');
+            }}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors"
+          >
+            Go back home
+          </button>
+        </div>
+      );
+    }
+    return <div className="flex h-screen items-center justify-center">Failed to load room</div>;
+  }
+  if (!room) return (
+    <div className="flex h-screen items-center justify-center flex-col gap-4">
+      <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      <div className="text-slate-400 font-medium animate-pulse">Loading room...</div>
+    </div>
+  );
+
+  const activeUsers = room.users.filter(u => !u.isSpectator);
+  const spectators = room.users.filter(u => u.isSpectator);
+  
+  // Calculate average (round up if .5 or higher)
+  const votes = activeUsers.map(u => u.vote).filter(v => v !== null && v !== "?" && v !== "☕") as string[];
+  const average = votes.length > 0 
+    ? Math.round(votes.reduce((acc, val) => acc + parseInt(val), 0) / votes.length)
+    : null;
+
+  return (
+    <div className="min-h-screen flex flex-col p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12 glass-panel p-4 px-6">
+        <div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 text-transparent bg-clip-text">
+            {room.name}
+          </h1>
+          <p className="text-sm text-slate-400 flex items-center gap-2 mt-1">
+            <Users className="w-4 h-4" /> {activeUsers.length} Voters | {spectators.length} Spectators
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={copyLink}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10 text-sm font-medium"
+          >
+            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copied!" : "Invite Players"}
+          </button>
+          <button
+            onClick={handleLeave}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors border border-red-500/20 text-sm font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Leave
+          </button>
+        </div>
+      </header>
+
+      {/* Main Board Area */}
+      <main className="flex-1 flex flex-col items-center">
+        {/* Table/Board */}
+        <div className="relative w-full max-w-4xl min-h-[400px] flex flex-col items-center justify-center mb-16">
+          
+          {/* Top Row Players */}
+          <div className="flex justify-center gap-6 mb-8 flex-wrap">
+            {activeUsers.slice(0, Math.ceil(activeUsers.length / 2)).map(user => (
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
+            ))}
+          </div>
+
+          {/* Center Table */}
+          <div className="w-full max-w-2xl h-32 md:h-48 bg-blue-500/5 border border-blue-500/20 rounded-[3rem] shadow-[0_0_50px_rgba(59,130,246,0.1)] flex items-center justify-center relative">
+            {room.isRevealed ? (
+              <div className="text-center">
+                <motion.div 
+                  initial={{ scale: 0.8, opacity: 0 }} 
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-4xl font-bold text-white mb-2"
+                >
+                  {average || "-"}
+                </motion.div>
+                <div className="text-sm text-slate-400 uppercase tracking-widest font-semibold">Average</div>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleAction("REVEAL")}
+                disabled={activeUsers.every(u => !u.vote) || room.isVotingClosed}
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {room.isVotingClosed ? "Voting Closed" : "Reveal Cards"}
+              </button>
+            )}
+
+            <div className="absolute -bottom-6 flex gap-3 z-10">
+              {room.isRevealed && (
+                <button
+                  onClick={() => handleAction("RESET")}
+                  className="bg-slate-800 border border-slate-700 hover:border-slate-500 text-slate-300 px-6 py-2 rounded-full flex items-center gap-2 transition-all shadow-xl"
+                >
+                  <RotateCcw className="w-4 h-4" /> Reset Board
+                </button>
+              )}
+              
+              {/* Only show Toggle Voting if not revealed */}
+              {!room.isRevealed && (
+                <button
+                  onClick={() => handleAction("TOGGLE_VOTING")}
+                  className={`border px-6 py-2 rounded-full flex items-center gap-2 transition-all shadow-xl
+                    ${room.isVotingClosed 
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
+                      : 'bg-slate-800 border-slate-700 hover:border-slate-500 text-slate-300'
+                    }`}
+                >
+                  {room.isVotingClosed ? "Resume Voting" : "Stop Voting"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Row Players */}
+          <div className="flex justify-center gap-6 mt-12 flex-wrap">
+            {activeUsers.slice(Math.ceil(activeUsers.length / 2)).map(user => (
+              <PlayerCard key={user.id} user={user} isRevealed={room.isRevealed} />
+            ))}
+          </div>
+
+        </div>
+
+        {/* Card Selection */}
+        {!currentUser?.isSpectator && (
+          <div className="w-full max-w-4xl mt-auto">
+            <h3 className="text-center text-sm font-medium text-slate-400 mb-4 uppercase tracking-widest">Choose your card</h3>
+            <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+              {FIBONACCI.map((val) => (
+                <button
+                  key={val}
+                  onClick={() => handleAction("VOTE", { userId, vote: myVote === val ? null : val })}
+                  disabled={room.isRevealed || room.isVotingClosed}
+                  className={`
+                    w-12 h-16 md:w-16 md:h-24 rounded-xl text-lg md:text-2xl font-bold transition-all
+                    flex items-center justify-center border-2 shadow-lg
+                    ${myVote === val 
+                      ? 'bg-blue-600 border-blue-400 text-white -translate-y-4 shadow-blue-500/50' 
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:-translate-y-2'}
+                    ${(room.isRevealed || room.isVotingClosed) ? 'opacity-50 cursor-not-allowed transform-none' : ''}
+                  `}
+                >
+                  {val}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
+      
+      {spectators.length > 0 && (
+        <div className="fixed bottom-4 left-4 flex gap-2">
+          <div className="px-3 py-1.5 bg-slate-800/80 border border-slate-700 rounded-lg text-xs text-slate-400 flex items-center gap-2 backdrop-blur">
+            <Eye className="w-3 h-3" />
+            {spectators.length} Spectators
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlayerCard({ user, isRevealed }: { user: any, isRevealed: boolean }) {
+  const hasVoted = user.vote !== null;
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className={`
+        w-16 h-24 md:w-20 md:h-28 rounded-xl flex items-center justify-center shadow-lg transition-all
+        ${!hasVoted ? 'bg-slate-800/50 border-2 border-dashed border-slate-700' : 
+          isRevealed ? 'bg-blue-600 border-2 border-blue-400' : 'bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-indigo-400'}
+      `}>
+        {isRevealed && hasVoted ? (
+          <span className="text-2xl font-bold text-white">{user.vote}</span>
+        ) : hasVoted ? (
+          <span className="w-6 h-6 rounded-full bg-white/20 animate-pulse" />
+        ) : null}
+      </div>
+      <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate text-center">
+        {user.name}
+      </span>
+    </div>
+  );
+}
