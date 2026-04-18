@@ -89,7 +89,7 @@ const TaskNameInput = ({ roomId, initialTaskName, mutate }: { roomId: string, in
 export default function RoomBoard({ roomId, userId }: { roomId: string, userId: string }) {
   const router = useRouter();
   const { data: room, error, mutate } = useSWR<Room>(`/api/room/${roomId}`, fetcher, {
-    refreshInterval: 1000, // Poll every second for real-time feel
+    refreshInterval: 3000, // Poll every 3 seconds to reduce DB usage
   });
   const [copied, setCopied] = useState(false);
   const [isEditingCards, setIsEditingCards] = useState(false);

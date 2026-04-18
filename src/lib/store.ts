@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis';
 import { Room } from './types';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL || '',
@@ -8,7 +9,7 @@ const redis = new Redis({
 
 const PREFIX = 'room:';
 
-export const getRoom = async (id: string): Promise<Room | null> => {
+const fetchRoomFromRedis = async (id: string): Promise<Room | null> => {
   try {
     const room = await redis.get<Room>(`${PREFIX}${id}`);
     return room;
@@ -16,6 +17,15 @@ export const getRoom = async (id: string): Promise<Room | null> => {
     console.error('Failed to get room from Upstash Redis:', error);
     return null;
   }
+};
+
+export const getRoom = async (id: string): Promise<Room | null> => {
+  const getCachedRoom = unstable_cache(
+    async () => fetchRoomFromRedis(id),
+    [`room-data-${id}`],
+    { tags: [`room-${id}`], revalidate: 86400 }
+  );
+  return getCachedRoom();
 };
 
 export const createRoom = async (name: string): Promise<Room> => {
@@ -38,4 +48,9 @@ export const createRoom = async (name: string): Promise<Room> => {
 
 export const updateRoom = async (id: string, room: Room): Promise<void> => {
   await redis.set(`${PREFIX}${id}`, room, { ex: 86400 });
+  try {
+    revalidateTag(`room-${id}`, 'default');
+  } catch (error) {
+    console.warn('Failed to revalidate room cache:', error);
+  }
 };

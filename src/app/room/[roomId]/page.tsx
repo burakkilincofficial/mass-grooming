@@ -20,7 +20,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   const [userId, setUserId] = useState<string | null>(null);
 
   const { data: room } = useSWR<Room>(!hasJoined ? `/api/room/${roomId}` : null, fetcher, {
-    refreshInterval: 1000,
+    refreshInterval: 3000, // Poll every 3 seconds to reduce DB usage
   });
 
   const takenAvatars = room?.users?.map(u => u.avatar).filter(Boolean) || [];
